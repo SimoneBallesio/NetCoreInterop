@@ -1,0 +1,1 @@
+add_dotnet_assembly(Interop.Core)

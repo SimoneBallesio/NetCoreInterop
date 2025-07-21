@@ -1,0 +1,16 @@
+# Visual Studio files
+**/*.sln
+**/*.vcxproj*
+.vscode/
+**/.vs/
+
+# Build files
+**/Build/
+**/obj/
+**/bin/
+
+#Binaries files
+**/Binaries/
+
+# OSX artifacts
+**/.DS_Store
