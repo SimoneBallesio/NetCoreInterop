@@ -5,7 +5,7 @@
 namespace Interop
 {
 
-	struct DynamicLibrary;
+	class DynamicLibrary;
 
 }
 

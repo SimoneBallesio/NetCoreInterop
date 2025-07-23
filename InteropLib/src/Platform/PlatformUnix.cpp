@@ -8,6 +8,8 @@
 
 #include <dlfcn.h>
 
+#include <vector>
+
 #define DYNAMIC_LIBRARY_PREFIX "lib"
 
 #ifdef INTEROP_PLATFORM_APPLE
@@ -24,29 +26,35 @@ namespace Interop::Platform
 	{
 		if (library == nullptr) [[unlikely]]
 		{
-			printf("Dynamic Library object not initialized. Aborting load of library \"%s\"", name);
+			printf("Dynamic Library object not initialized. Aborting load of library \"%s\"\n", name);
 			return false;
 		}
 
 		if (library->Binaries != nullptr) [[unlikely]]
 		{
-			printf("Dynamic library \"%s\" already loaded in memory.", name);
+			printf("Dynamic library \"%s\" already loaded in memory.\n", name);
 			return true;
 		}
 
-		char buffer[200] = {};
-		snprintf(buffer, 200, "%s%s%s%s", path, DYNAMIC_LIBRARY_PREFIX, name, DYNAMIC_LIBRARY_EXTENSION);
+		std::vector<char> assemblyPath;
+		size_t assemblyPathLength = strlen(path) + strlen(DYNAMIC_LIBRARY_PREFIX) + strlen(name) + strlen(DYNAMIC_LIBRARY_EXTENSION) + 2;
 
-		void* binaries = dlopen(buffer, RTLD_NOW);
+		assemblyPath.resize(assemblyPathLength);
+		snprintf(assemblyPath.data(), assemblyPathLength, "%s/%s%s%s", path, DYNAMIC_LIBRARY_PREFIX, name, DYNAMIC_LIBRARY_EXTENSION);
+
+		void* binaries = dlopen(assemblyPath.data(), RTLD_NOW);
 
 		if (library == nullptr)
 		{
-			printf("Unable to locate library \"%s\" in the specified location (%s), falling back to /usr/local/lib", name, buffer);
+			printf("Unable to locate library \"%s\" in the specified location (%s), falling back to /usr/local/lib\n", name, assemblyPath.data());
 
-			memset(buffer, 0, 200 * sizeof(char));
-			snprintf(buffer, 200, "/usr/local/lib/%s%s%s", DYNAMIC_LIBRARY_PREFIX, name, DYNAMIC_LIBRARY_EXTENSION);
+			assemblyPathLength = strlen("/usr/local/lib/") + strlen(DYNAMIC_LIBRARY_PREFIX) + strlen(name) + strlen(DYNAMIC_LIBRARY_EXTENSION) + 1;
 
-			binaries = dlopen(buffer, RTLD_NOW);
+			assemblyPath.resize(assemblyPathLength);
+			assemblyPath.clear();
+			snprintf(assemblyPath.data(), assemblyPathLength, "/usr/local/lib/%s%s%s", DYNAMIC_LIBRARY_PREFIX, name, DYNAMIC_LIBRARY_EXTENSION);
+
+			binaries = dlopen(assemblyPath.data(), RTLD_NOW);
 		}
 
 		if (library == nullptr)
@@ -56,7 +64,6 @@ namespace Interop::Platform
 		}
 
 		library->Name = name;
-		library->Path = buffer;
 		library->Binaries = binaries;
 
 		return true;
@@ -66,19 +73,19 @@ namespace Interop::Platform
 	{
 		if (library == nullptr) [[unlikely]]
 		{
-			printf("Unable to unload library function, Dynamic Library object not initialized.");
+			printf("%s\n", "Unable to unload library function, Dynamic Library object not initialized.");
 			return false;
 		}
 
 		if (library->Binaries == nullptr) [[unlikely]]
 		{
-			printf("Unable to unload library \"%s\"", library->Name);
+			printf("Unable to unload library \"%s\"\n", library->Name);
 			return false;
 		}
 
 		if (library->Functions.find(name) != library->Functions.end())
 		{
-			printf("The function pointer for function \"%s\" has already been loaded.", name);
+			printf("The function pointer for function \"%s\" has already been loaded.\n", name);
 			return true;
 		}
 
@@ -86,7 +93,7 @@ namespace Interop::Platform
 
 		if (fnPtr == nullptr)
 		{
-			printf("Unable to load function \"%s\" from library \"%s\"", name, library->Name);
+			printf("Unable to load function \"%s\" from library \"%s\"\n", name, library->Name);
 			return false;
 		}
 
@@ -99,13 +106,13 @@ namespace Interop::Platform
 	{
 		if (library == nullptr) [[unlikely]]
 		{
-			printf("Unable to unload library, DynamicLibrary object not initialized.");
+			printf("%s\n", "Unable to unload library, DynamicLibrary object not initialized.");
 			return false;
 		}
 
 		if (library->Binaries == nullptr) [[unlikely]]
 		{
-			printf("Unable to unload library \"%s\"", library->Name);
+			printf("Unable to unload library \"%s\"\n", library->Name);
 			return false;
 		}
 
@@ -113,7 +120,7 @@ namespace Interop::Platform
 
 		if (result != 0)
 		{
-			printf("Unloading of library \"%s\" failed.", library->Name);
+			printf("Unloading of library \"%s\" failed.\n", library->Name);
 			return false;
 		}
 
