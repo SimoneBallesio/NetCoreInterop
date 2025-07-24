@@ -33,7 +33,7 @@ namespace Interop::NetCore
 		NetCoreVersion() = default;
 		NetCoreVersion(const char* version);
 		NetCoreVersion(u16 major, u16 minor, u16 patch);
-		
+
 		~NetCoreVersion() = default;
 
 		NetCoreReleaseType Type = INTEROP_NETCORE_RELEASE_TYPE_RELEASE;
@@ -145,5 +145,5 @@ namespace Interop::NetCore
 
 		return false;
 	}
-	
+
 }

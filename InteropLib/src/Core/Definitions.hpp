@@ -49,6 +49,13 @@ typedef bool b8;
 #define INTEROP_PLATFORM_POSIX 1
 #endif
 
+#ifdef INTEROP_PLATFORM_WINDOWS
+#define INTEROP_DELEGATE_CALLTYPE __stdcall
+
+#else
+#define INTEROP_DELEGATE_CALLTYPE
+#endif
+
 #ifdef INTEROP_EXPORT
 #ifdef _MSC_VER
 #define INTEROP_API __declspec(dllexport)

@@ -2,6 +2,7 @@
 #include "Core/DynamicLibrary.hpp"
 #include "Core/HostedAssembly.hpp"
 
+#include "NetCore/NetCoreContext.hpp"
 #include "NetCore/NetCoreController.hpp"
 #include "NetCore/NetCoreVersion.hpp"
 
@@ -12,6 +13,7 @@
 
 #include <vector>
 #include <filesystem>
+#include <string>
 
 #ifdef INTEROP_PLATFORM_UNIX
 #define INTEROP_PATH_DELIMITER ":"
@@ -61,6 +63,154 @@ namespace Interop::NetCore
 			printf("%s\n", "Unable to load the necessary function pointers from hostfxr");
 			return false;
 		}
+
+		return true;
+	}
+
+	b8 Controller::OpenContext(HostedAssembly* assembly)
+	{
+		if (assembly == nullptr) [[unlikely]]
+		{
+			printf("%s\n", "Unable to open a .NET context, no assembly specified");
+			return false;
+		}
+
+		if (m_CurrentContext != nullptr)
+		{
+			if (m_CurrentContext->Context != nullptr)
+			{
+				if (m_CurrentContext->LoadFunctionPointer != nullptr)
+				{
+					printf("%s\n", ".NET context already initialized");
+					return true;
+				}
+
+				printf("%s\n", "Invalid .NET context, please close it fully before reusing it");
+				return false;
+			}
+		}
+
+		m_CurrentContext = new NetCoreContext();
+
+		if (m_Hostfxr->Binaries == nullptr || m_Hostfxr->Functions.empty()) [[unlikely]]
+		{
+			printf("%s\n", "Unable to open a .NET context, hostfxr has not been initialized");
+			delete m_CurrentContext;
+
+			return false;
+		}
+
+		const auto initForRuntime = (hostfxr_initialize_for_runtime_config_fn)m_Hostfxr->Functions[INTEROP_HOSTFXR_INIT_FN_NAME];
+		const auto close = (hostfxr_close_fn)m_Hostfxr->Functions[INTEROP_HOSTFXR_CLOSE_FN_NAME];
+
+		std::string runtimeCfgPath = std::string(assembly->Path);
+		runtimeCfgPath += assembly->Name;
+		runtimeCfgPath += ".runtimeconfig.json";
+
+		i32 result = initForRuntime(runtimeCfgPath.c_str(), nullptr, &m_CurrentContext->Context);
+
+		if (result != 0)
+		{
+			printf("Unable to load or parse .NET runtime configuration file (Path: \"%s\")\n", runtimeCfgPath.c_str());
+
+			close(m_CurrentContext->Context);
+			delete m_CurrentContext;
+
+			return false;
+		}
+
+		const auto getRuntimeDelegate = (hostfxr_get_runtime_delegate_fn)m_Hostfxr->Functions[INTEROP_HOSTFXR_GET_DELEGATE_FN_NAME];
+		result = getRuntimeDelegate(m_CurrentContext->Context, hdt_load_assembly_and_get_function_pointer, &m_CurrentContext->LoadFunctionPointer);
+
+		if (result != 0)
+		{
+			printf("%s\n", "Unable to load function to fetch C# methods. Aborting.");
+
+			close(m_CurrentContext->Context);
+			delete m_CurrentContext;
+
+			return false;
+		}
+
+		return true;
+	}
+
+	b8 Controller::CloseContext()
+	{
+		if (m_CurrentContext == nullptr) [[unlikely]]
+		{
+			printf("%s\n", "The .NET context is already closed");
+			return true;
+		}
+
+		if (m_Hostfxr->Binaries == nullptr || m_Hostfxr->Functions.empty()) [[unlikely]]
+		{
+			printf("%s\n", "Unable to open a .NET context, hostfxr has not been initialized");
+			return false;
+		}
+
+		const auto close = (hostfxr_close_fn)m_Hostfxr->Functions[INTEROP_HOSTFXR_CLOSE_FN_NAME];
+
+		close(m_CurrentContext->Context);
+		delete m_CurrentContext;
+
+		return true;
+	}
+
+	b8 Controller::LoadAssemblyFunction(const char* name, const char* classPath, HostedAssembly* assembly) const
+	{
+		if (name == nullptr) [[unlikely]]
+		{
+			printf("%s\n", "Unable to load function pointer from .NET assembly, no function name provided.");
+			return false;
+		}
+
+		if (classPath == nullptr) [[unlikely]]
+		{
+			printf("Unable to load function \"%s\" from .NET assembly, no class path specified\n", name);
+			return false;
+		}
+
+		if (assembly == nullptr) [[unlikely]]
+		{
+			printf("Unable to load function \"%s\" from .NET assembly, the HostedAssembly object has not been initialized\n", name);
+			return false;
+		}
+
+		if (assembly->Functions.find(name) != assembly->Functions.end())
+		{
+			printf("Function \"%s\" already loaded for .NET assembly \"%s\"\n", name, assembly->Name);
+			return true;
+		}
+
+		if (m_CurrentContext == nullptr)
+		{
+			printf("%s\n", ".NET context close, please open it before trying to load functions");
+			return false;
+		}
+
+		std::string assemblyPath = std::string(assembly->Path);
+		assemblyPath += assembly->Name;
+		assemblyPath += ".dll";
+
+		std::string qualifiedType = std::string(classPath);
+		qualifiedType += ", ";
+		qualifiedType += assembly->Name;
+
+		void* fn = nullptr;
+		i32 result = ((load_assembly_and_get_function_pointer_fn)m_CurrentContext->LoadFunctionPointer)
+		(
+			assemblyPath.c_str(),
+			qualifiedType.c_str(),
+			name,
+			UNMANAGEDCALLERSONLY_METHOD,
+			nullptr,
+			&fn
+		);
+
+		if (result != 0) return false;
+
+		assembly->Functions[name] = fn;
 
 		return true;
 	}

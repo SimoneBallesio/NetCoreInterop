@@ -11,7 +11,7 @@ namespace Interop
 	{
 	public:
 		HostedAssembly(HostedAssembly&) = delete;
-		HostedAssembly(const char* name) : Name(name) {}
+		HostedAssembly(const char* name, const char* path = "./") : Name(name), Path(path) {}
 
 		~HostedAssembly() = default;
 
@@ -37,7 +37,7 @@ namespace Interop
 	template <typename T>
 	INTEROP_INLINE T HostedAssembly::GetFunction(const char* name) const
 	{
-		return static_cast<T>(Functions.at(name));
+		return reinterpret_cast<T>(Functions.at(name));
 	}
 
 }
