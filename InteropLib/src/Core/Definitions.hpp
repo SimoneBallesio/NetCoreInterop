@@ -98,3 +98,5 @@ typedef bool b8;
 #define INTEROP_NOINLINE
 
 #endif
+
+#define INTEROP_NAMEOF(x) (#x)

@@ -1,6 +1,7 @@
 #include "Core/Definitions.hpp"
 #include "Core/DynamicLibrary.hpp"
 #include "Core/HostedAssembly.hpp"
+#include "Core/Memory.hpp"
 
 #include "NetCore/NetCoreContext.hpp"
 #include "NetCore/NetCoreController.hpp"
@@ -44,6 +45,21 @@ namespace Interop::NetCore
 			delete m_Hostfxr;
 			m_Hostfxr = nullptr;
 		}
+
+		if (m_Memory != nullptr)
+		{
+			if (m_Memory->State == INTEROP_MEMORY_MAP_STATE_OPEN)
+			{
+				b8 success = Platform::CloseMemoryMap(m_Memory);
+
+				if (!success)
+				{
+					printf("%s\n", "Unable to close properly shared memory area between controller and hosted libraries");
+				}
+
+				delete m_Memory;
+			}
+		}
 	}
 
 	b8 Controller::Init()
@@ -61,6 +77,20 @@ namespace Interop::NetCore
 		if (!success)
 		{
 			printf("%s\n", "Unable to load the necessary function pointers from hostfxr");
+			return false;
+		}
+
+		m_Memory = new SharedMemoryArea();
+		m_Memory->Name = "/tmp/Controller";
+		m_Memory->Size = 8192;
+
+		success = Platform::OpenOrCreateMemoryMap(m_Memory);
+
+		if (!success)
+		{
+			printf("%s\n", "Unable to create shared memory area for C++/C# interoperability");
+			delete m_Memory;
+
 			return false;
 		}
 

@@ -3,10 +3,16 @@
 #ifdef INTEROP_PLATFORM_UNIX
 
 #include "Core/DynamicLibrary.hpp"
+#include "Core/Memory.hpp"
 
 #include "Platform/Platform.hpp"
 
 #include <dlfcn.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+#include <sys/mman.h>
+#include <sys/stat.h>
 
 #include <vector>
 
@@ -125,6 +131,88 @@ namespace Interop::Platform
 		}
 
 		memset(library, 0, sizeof(DynamicLibrary));
+
+		return true;
+	}
+
+	b8 OpenOrCreateMemoryMap(SharedMemoryArea* memory)
+	{
+		if (memory->Name == nullptr) [[unlikely]]
+		{
+			printf("%s\n", "Unable to open or create share memory map, no name has been provided");
+			return false;
+		}
+
+		if (memory->State == INTEROP_MEMORY_MAP_STATE_OPEN)
+		{
+			printf("Shared memory map \"%s\" is already open\n", memory->Name);
+			return true;
+		}
+
+		memory->Size = pow(2, ceil(log2(memory->Size) / log2(2)));
+
+		if (memory->Size == 0)
+		{
+			printf("Unable to open or create shared memory map \"%s\" with a size of 0", memory->Name);
+			return false;
+		}
+
+		i32 fd = open(memory->Name, O_CREAT | O_RDWR, (mode_t)00700);
+
+		if (fd == -1)
+		{
+			printf("Unable to get native handle for shared memory map \"%s\" (size: %d)\n", memory->Name, memory->Size);
+			return false;
+		}
+
+		struct stat mapstat;
+		if (-1 != fstat(fd, &mapstat) && mapstat.st_size == 0)
+		{
+			ftruncate(fd, memory->Size);
+		}
+
+		memory->BaseAddress = mmap(0, memory->Size, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
+
+		if (memory->BaseAddress == MAP_FAILED)
+		{
+			printf("Unable to open or create shared memory map \"%s\" (size: %d)\n", memory->Name, memory->Size);
+			memory->BaseAddress = nullptr;
+			return false;
+		}
+
+		if (close(fd) != -1)
+		{
+			memory->State = INTEROP_MEMORY_MAP_STATE_OPEN;
+			return true;
+		}
+
+		printf("Unable to open or create shared memory map \"%s\" (size: %d)\n", memory->Name, memory->Size);
+		return false;
+	}
+
+	b8 CloseMemoryMap(SharedMemoryArea* memory)
+	{
+		if (memory->State != INTEROP_MEMORY_MAP_STATE_OPEN)
+		{
+			printf("Shared memory map \"%s\" is already closed\n", memory->Name);
+			return true;
+		}
+
+		if (munmap(memory->BaseAddress, memory->Size) == -1)
+		{
+			printf("Unable to close shared memory map \"%s\" (size: %d)\n", memory->Name, memory->Size);
+			return false;
+		}
+
+		if (unlink(memory->Name) == -1)
+		{
+			printf("Unable to close shared memory map \"%s\" (size: %d)\n", memory->Name, memory->Size);
+			return false;
+		}
+
+		memory->State = INTEROP_MEMORY_MAP_STATE_CLOSED;
+		memory->BaseAddress = nullptr;
+		memory->NativeHandle = nullptr;
 
 		return true;
 	}

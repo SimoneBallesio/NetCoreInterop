@@ -3,6 +3,7 @@
 #ifdef INTEROP_PLATFORM_WIN32
 
 #include "Core/DynamicLibrary.hpp"
+#include "Core/Memory.hpp"
 
 #include "Platform/Platform.hpp"
 
@@ -75,7 +76,7 @@ namespace Interop::Platform
 			return true;
 		}
 
-		FARPROC fnPtr = GetProcAddress(static_cast<HMODULE>(library->Binaries), name);
+		FARPROC fnPtr = GetProcAddress((HMODULE)library->Binaries, name);
 
 		if (fnPtr == nullptr)
 		{
@@ -102,7 +103,7 @@ namespace Interop::Platform
 			return false;
 		}
 
-		BOOL result = FreeLibrary(static_cast<HMODULE>(library->Binaries));
+		BOOL result = FreeLibrary((HMODULE)library->Binaries);
 
 		if (!result)
 		{
@@ -113,6 +114,85 @@ namespace Interop::Platform
 		memset(library, 0, sizeof(DynamicLibrary));
 
 		return true;
+	}
+
+	b8 OpenOrCreateMemoryMap(SharedMemoryArea* memory)
+	{
+		if (memory->Name == nullptr) [[unlikely]]
+		{
+			printf("%s\n", "Unable to open or create share memory map, no name has been provided");
+			return false;
+		}
+
+		if (memory->State == INTEROP_MEMORY_MAP_STATE_OPEN)
+		{
+			printf("Shared memory map \"%s\" is already open\n", memory->Name);
+			return true;
+		}
+
+		memory->Size = pow(2, ceil(log2(memory->Size) / log2(2)));
+
+		if (memory->Size == 0)
+		{
+			printf("Unable to open or create shared memory map \"%s\" with a size of 0", memory->Name);
+			return false;
+		}
+
+		memory->NativeHandle = (void*)OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, memory->Name);
+
+		if (memory->NativeHandle == nullptr)
+		{
+			memory->NativeHandle = (void*)CreateFileMapping
+			(
+				INVALID_HANDLE_VALUE,
+				nullptr,
+				PAGE_READWRITE,
+				0,
+				memory->Size,
+				memory->Name
+			);
+		}
+
+		if (memory->NativeHandle == nullptr)
+		{
+			printf("Unable to get native handle for shared memory map \"%s\" (size: %d)\n", memory->Name, memory->Size);
+			return false;
+		}
+
+		memory->BaseAddress = MapViewOfFile((HANDLE)memory->NativeHandle, FILE_MAP_ALL_ACCESS, 0, 0, memory->Size);
+
+		if (memory->BaseAddress != nullptr)
+		{
+			memory->State = INTEROP_MEMORY_MAP_STATE_OPEN;
+			return true;
+		}
+
+		printf("Unable to open or create shared memory map \"%s\" (size: %d)\n", memory->Name, memory->Size);
+		return false;
+	}
+
+	b8 CloseMemoryMap(SharedMemoryArea* memory)
+	{
+		if (memory->State != INTEROP_MEMORY_MAP_STATE_OPEN)
+		{
+			printf("Shared memory map \"%s\" is already closed\n", memory->Name);
+			return true;
+		}
+
+		bool success = UnmapViewOfFile(memory->BaseAddress);
+		if (success) success = CloseHandle((HANDLE)memory->NativeHandle);
+
+		if (success)
+		{
+			memory->State = INTEROP_MEMORY_MAP_STATE_CLOSED;
+			memory->BaseAddress = nullptr;
+			memory->NativeHandle = nullptr;
+
+			return true;
+		}
+
+		printf("Unable to close shared memory map \"%s\" (size: %d)\n", memory->Name, memory->Size);
+		return false;
 	}
 
 }
