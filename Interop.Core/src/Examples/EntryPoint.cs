@@ -140,8 +140,9 @@ public static partial class EntryPoint
 
 		CustomObject objToWrite = new() { TextProp = "Quare Id Faciam", DoubleProp = 75.46943 };
 		Marshal.StructureToPtr(objToWrite, handle.AddrOfPinnedObject(), true);
+		handle.Free();
 
-		view.Write(buffer, index * customObjSize, customObjSize);
+		view.Write(buffer, 0, customObjSize);
 	}
 
 	/// <summary>

@@ -100,3 +100,5 @@ typedef bool b8;
 #endif
 
 #define INTEROP_NAMEOF(x) (#x)
+
+#define INTEROP_ALIGNED_SIZE(x) pow(2, ceil(log2((x)) / log2(2)))

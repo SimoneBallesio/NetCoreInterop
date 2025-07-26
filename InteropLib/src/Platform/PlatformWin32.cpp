@@ -116,7 +116,7 @@ namespace Interop::Platform
 		return true;
 	}
 
-	b8 OpenOrCreateMemoryMap(SharedMemoryArea* memory)
+	b8 OpenOrCreateMemoryMap(Memory::SharedBuffer* memory)
 	{
 		if (memory->Name == nullptr) [[unlikely]]
 		{
@@ -124,13 +124,13 @@ namespace Interop::Platform
 			return false;
 		}
 
-		if (memory->State == INTEROP_MEMORY_MAP_STATE_OPEN)
+		if (memory->State == Memory::INTEROP_MEMORY_MAP_STATE_OPEN)
 		{
 			printf("Shared memory map \"%s\" is already open\n", memory->Name);
 			return true;
 		}
 
-		memory->Size = pow(2, ceil(log2(memory->Size) / log2(2)));
+		memory->Size = INTEROP_ALIGNED_SIZE(memory->Size);
 
 		if (memory->Size == 0)
 		{
@@ -163,7 +163,7 @@ namespace Interop::Platform
 
 		if (memory->BaseAddress != nullptr)
 		{
-			memory->State = INTEROP_MEMORY_MAP_STATE_OPEN;
+			memory->State = Memory::INTEROP_MEMORY_MAP_STATE_OPEN;
 			return true;
 		}
 
@@ -171,9 +171,9 @@ namespace Interop::Platform
 		return false;
 	}
 
-	b8 CloseMemoryMap(SharedMemoryArea* memory)
+	b8 CloseMemoryMap(Memory::SharedBuffer* memory)
 	{
-		if (memory->State != INTEROP_MEMORY_MAP_STATE_OPEN)
+		if (memory->State != Memory::INTEROP_MEMORY_MAP_STATE_OPEN)
 		{
 			printf("Shared memory map \"%s\" is already closed\n", memory->Name);
 			return true;
@@ -184,7 +184,7 @@ namespace Interop::Platform
 
 		if (success)
 		{
-			memory->State = INTEROP_MEMORY_MAP_STATE_CLOSED;
+			memory->State = Memory::INTEROP_MEMORY_MAP_STATE_CLOSED;
 			memory->BaseAddress = nullptr;
 			memory->NativeHandle = nullptr;
 

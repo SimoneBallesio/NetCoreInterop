@@ -135,7 +135,7 @@ namespace Interop::Platform
 		return true;
 	}
 
-	b8 OpenOrCreateMemoryMap(SharedMemoryArea* memory)
+	b8 OpenOrCreateMemoryMap(Memory::SharedBuffer* memory)
 	{
 		if (memory->Name == nullptr) [[unlikely]]
 		{
@@ -143,13 +143,13 @@ namespace Interop::Platform
 			return false;
 		}
 
-		if (memory->State == INTEROP_MEMORY_MAP_STATE_OPEN)
+		if (memory->State == Memory::INTEROP_MEMORY_MAP_STATE_OPEN)
 		{
 			printf("Shared memory map \"%s\" is already open\n", memory->Name);
 			return true;
 		}
 
-		memory->Size = pow(2, ceil(log2(memory->Size) / log2(2)));
+		memory->Size = INTEROP_ALIGNED_SIZE(memory->Size);
 
 		if (memory->Size == 0)
 		{
@@ -157,7 +157,10 @@ namespace Interop::Platform
 			return false;
 		}
 
-		i32 fd = open(memory->Name, O_CREAT | O_RDWR, (mode_t)00700);
+		std::string name = std::string("/tmp/");
+		name += memory->Name;
+
+		i32 fd = open(name.c_str(), O_CREAT | O_RDWR, (mode_t)00700);
 
 		if (fd == -1)
 		{
@@ -182,7 +185,7 @@ namespace Interop::Platform
 
 		if (close(fd) != -1)
 		{
-			memory->State = INTEROP_MEMORY_MAP_STATE_OPEN;
+			memory->State = Memory::INTEROP_MEMORY_MAP_STATE_OPEN;
 			return true;
 		}
 
@@ -190,9 +193,9 @@ namespace Interop::Platform
 		return false;
 	}
 
-	b8 CloseMemoryMap(SharedMemoryArea* memory)
+	b8 CloseMemoryMap(Memory::SharedBuffer* memory)
 	{
-		if (memory->State != INTEROP_MEMORY_MAP_STATE_OPEN)
+		if (memory->State != Memory::INTEROP_MEMORY_MAP_STATE_OPEN)
 		{
 			printf("Shared memory map \"%s\" is already closed\n", memory->Name);
 			return true;
@@ -204,13 +207,16 @@ namespace Interop::Platform
 			return false;
 		}
 
-		if (unlink(memory->Name) == -1)
+		std::string name = std::string("/tmp/");
+		name += memory->Name;
+
+		if (unlink(name.c_str()) == -1)
 		{
 			printf("Unable to close shared memory map \"%s\" (size: %d)\n", memory->Name, memory->Size);
 			return false;
 		}
 
-		memory->State = INTEROP_MEMORY_MAP_STATE_CLOSED;
+		memory->State = Memory::INTEROP_MEMORY_MAP_STATE_CLOSED;
 		memory->BaseAddress = nullptr;
 		memory->NativeHandle = nullptr;
 

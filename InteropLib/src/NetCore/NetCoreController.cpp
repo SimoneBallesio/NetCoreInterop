@@ -40,25 +40,21 @@ namespace Interop::NetCore
 
 	Controller::~Controller()
 	{
+		Destroy();
+	}
+
+	void Controller::Destroy()
+	{
 		if (m_Hostfxr != nullptr)
 		{
 			delete m_Hostfxr;
 			m_Hostfxr = nullptr;
 		}
 
-		if (m_Memory != nullptr)
+		if (m_MemoryState != nullptr)
 		{
-			if (m_Memory->State == INTEROP_MEMORY_MAP_STATE_OPEN)
-			{
-				b8 success = Platform::CloseMemoryMap(m_Memory);
-
-				if (!success)
-				{
-					printf("%s\n", "Unable to close properly shared memory area between controller and hosted libraries");
-				}
-
-				delete m_Memory;
-			}
+			Memory::Destroy(&m_MemoryState);
+			m_MemoryState = nullptr;
 		}
 	}
 
@@ -77,19 +73,17 @@ namespace Interop::NetCore
 		if (!success)
 		{
 			printf("%s\n", "Unable to load the necessary function pointers from hostfxr");
+			Destroy();
+
 			return false;
 		}
 
-		m_Memory = new SharedMemoryArea();
-		m_Memory->Name = "/tmp/Controller";
-		m_Memory->Size = 8192;
-
-		success = Platform::OpenOrCreateMemoryMap(m_Memory);
+		success = Memory::Init(&m_MemoryState);
 
 		if (!success)
 		{
-			printf("%s\n", "Unable to create shared memory area for C++/C# interoperability");
-			delete m_Memory;
+			printf("%s\n", "Unable to init the necessary shared memory system");
+			Destroy();
 
 			return false;
 		}

@@ -6,7 +6,13 @@ namespace Interop
 {
 
 	class DynamicLibrary;
-	struct SharedMemoryArea;
+
+}
+
+namespace Interop::Memory
+{
+
+	struct SharedBuffer;
 
 }
 
@@ -17,7 +23,7 @@ namespace Interop::Platform
 	b8 LoadLibraryFunction(const char* name, DynamicLibrary* library);
 	b8 UnloadLibrary(DynamicLibrary* library);
 
-	b8 OpenOrCreateMemoryMap(SharedMemoryArea* memory);
-	b8 CloseMemoryMap(SharedMemoryArea* memory);
+	b8 OpenOrCreateMemoryMap(Memory::SharedBuffer* memory);
+	b8 CloseMemoryMap(Memory::SharedBuffer* memory);
 
 }

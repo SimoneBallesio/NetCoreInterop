@@ -1,5 +1,6 @@
 #include <Core/Definitions.hpp>
 #include <Core/HostedAssembly.hpp>
+#include <Core/Memory.hpp>
 
 #include <NetCore/NetCoreController.hpp>
 
@@ -39,16 +40,21 @@ int main(int argc, char* argv[])
 	auto WriteObjectToSharedMemory = interopCore.GetFunction<WriteObjectToSharedMemoryFn>("WriteObjectToSharedMemory");
 
 	Interop::NetCore::Api::CustomObject exampleObj = {};
+
 	PrintObjProperties((void*)&exampleObj);
 	PassObjectToHost();
 	DelegateRoundabout();
 
-	controller.Write(exampleObj, 1);
+	Interop::Memory::Set<Interop::NetCore::Api::CustomObject>(1, exampleObj);
 	ReadObjectFromSharedMemory(1);
 
-	WriteObjectToSharedMemory(0);
-	controller.Read(exampleObj, 0);
-	PrintObjProperties((void*)&exampleObj);
+	WriteObjectToSharedMemory(2);
+	auto sharedObj = Interop::Memory::Get<Interop::NetCore::Api::CustomObject>(2);
+	PrintObjProperties((void*)sharedObj);
+
+	snprintf(sharedObj->TextProperty, 256, "%s", "Edited from C++ code");
+	sharedObj->DoubleProperty = 6.28572856;
+	PrintObjProperties((void*)sharedObj);
 
 	return 0;
 }
